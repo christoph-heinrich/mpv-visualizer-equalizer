@@ -131,12 +131,14 @@ local axis_1 = "image/png;base64," ..
 
 local options = require 'mp.options'
 local msg     = require 'mp.msg'
+local utils = require "mp.utils"
 
 options.read_options(opts)
 opts.height = math.min(12, math.max(4, opts.height))
 opts.height = math.floor(opts.height)
 
 local function get_visualizer(name, quality, vtrack)
+    --msg.info("get_visualizer " .. name)
     local w, h, fps
 
     if quality == "verylow" then
@@ -161,10 +163,13 @@ local function get_visualizer(name, quality, vtrack)
 
     h = w * opts.height / 16
 
+    local atrack = mp.get_property_native("current-tracks/audio")
+    local aid = "[aid" .. tostring(atrack and atrack.id or 1) .. "]"
+
     if name == "showcqt" then
         local count = math.ceil(w * 180 / 1920 / fps)
 
-        return "[aid1] asplit [ao]," ..
+        return aid .. " asplit [ao]," ..
             "afifo, aformat     = channel_layouts = stereo," ..
             "firequalizer       =" ..
                 "gain           = '1.4884e8 * f*f*f / (f*f + 424.36) / (f*f + 1.4884e8) / sqrt(f*f + 25122.25)':" ..
@@ -191,7 +196,7 @@ local function get_visualizer(name, quality, vtrack)
 
 
     elseif name == "avectorscope" then
-        return "[aid1] asplit [ao]," ..
+        return aid .. " asplit [ao]," ..
             "afifo," ..
             "aformat            =" ..
                 "sample_rates   = 192000," ..
@@ -202,7 +207,7 @@ local function get_visualizer(name, quality, vtrack)
 
 
     elseif name == "showspectrum" then
-        return "[aid1] asplit [ao]," ..
+        return aid .. " asplit [ao]," ..
             "afifo," ..
             "showspectrum       =" ..
                 "size           =" .. w .. "x" .. h .. ":" ..
@@ -212,7 +217,7 @@ local function get_visualizer(name, quality, vtrack)
     elseif name == "showcqtbar" then
         local axis_h = math.ceil(w * 12 / 1920) * 4
 
-        return "[aid1] asplit [ao]," ..
+        return aid .. " asplit [ao]," ..
             "afifo, aformat     = channel_layouts = stereo," ..
             "firequalizer       =" ..
                 "gain           = '1.4884e8 * f*f*f / (f*f + 424.36) / (f*f + 1.4884e8) / sqrt(f*f + 25122.25)':" ..
@@ -247,7 +252,7 @@ local function get_visualizer(name, quality, vtrack)
 
 
     elseif name == "showwaves" then
-        return "[aid1] asplit [ao]," ..
+        return aid .. " asplit [ao]," ..
             "afifo," ..
             "showwaves          =" ..
                 "size           =" .. w .. "x" .. h .. ":" ..
@@ -263,9 +268,9 @@ local function get_visualizer(name, quality, vtrack)
             end
         end
         if hasvideo then
-            return "[aid1] asetpts=PTS [ao]; [vid1] setpts=PTS [vo]"
+            return aid .. " asetpts=PTS [ao]; [vid1] setpts=PTS [vo]"
         else
-            return "[aid1] asetpts=PTS [ao];" ..
+            return aid .. " asetpts=PTS [ao];" ..
                 "color      =" ..
                     "c      = Black:" ..
                     "s      =" .. w .. "x" .. h .. "," ..
@@ -305,8 +310,13 @@ local function visualizer_hook()
         return
     end
 
+    local vid = mp.get_property("vid")
+    local aid = mp.get_property("aid")
     local atrack = mp.get_property_native("current-tracks/audio")
     local vtrack = mp.get_property_native("current-tracks/video")
+
+    --mp.msg.info("vtrack " .. utils.to_string(vtrack))
+    --mp.msg.info("atrack " .. utils.to_string(atrack))
 
     --no tracks selected (yet)
     if atrack == nil and vtrack == nil then
@@ -319,6 +329,7 @@ local function visualizer_hook()
         end
     end
 
+    --msg.info("vizualizer " .. current_visualizer)
     --prevent endless loop
     if current_visualizer ~= opts.name then
         local lavfi = select_visualizer(vtrack)
@@ -334,7 +345,7 @@ mp.observe_property("current-tracks/audio", "native", visualizer_hook)
 mp.observe_property("current-tracks/video", "native", visualizer_hook)
 
 local function cycle_visualizer()
-    local i, index = 1
+    local index = 1
     for i = 1, #visualizer_name_list do
         if (visualizer_name_list[i] == opts.name) then
             index = i + 1
